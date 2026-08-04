@@ -1,0 +1,9 @@
+# Local machine config, not project config — contains this student's AWS profile name
+.aws-env.sh
+
+# University copyrighted assessment brief — not project source
+CAB432 - Assessment 1 - Cloud-Native API.pdf
+
+# OS/editor cruft
+.DS_Store
+**/.DS_Store
