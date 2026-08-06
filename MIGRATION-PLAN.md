@@ -25,36 +25,37 @@ Check items off as you complete and verify them. Mirrors the phases in section 2
 ### Phase 1 — Identity: Cognito
 
 - [x] Create Cognito user pool (`n<id>-strobe-users`), email as username/alias
-- [ ] Set password policy compatible with `validatePassword` (min length 6, no complexity requirements)
-- [ ] Configure email via Amazon SES, source `noreply@cab432.com`
-- [ ] Create app client, no client secret, enable `ALLOW_USER_PASSWORD_AUTH` + `ALLOW_ADMIN_USER_PASSWORD_AUTH`
-- [ ] Set access/ID token validity ≤ 24h
-- [ ] Create `moderators` group
-- [ ] Rewrite `registerUser` in `authService.js` (Cognito SignUp + DynamoDB row)
-- [ ] Rewrite `loginUser` in `authService.js` (Cognito InitiateAuth)
-- [ ] Rewrite `authenticate()` middleware (JWKS verification via `aws-jwt-verify`)
-- [ ] Rewrite `deleteUserAccount` (AdminDeleteUser)
-- [ ] Pre-create + confirm test account, add to `moderators` group
+- [x] Set password policy compatible with `validatePassword` (min length 6, no complexity requirements)
+- [x] Configure email via Amazon SES, source `noreply@cab432.com`
+- [x] Create app client, no client secret, enable `ALLOW_USER_PASSWORD_AUTH` + `ALLOW_ADMIN_USER_PASSWORD_AUTH`
+- [x] Set access/ID token validity ≤ 24h
+- [x] Create `moderators` group
+- [x] Rewrite `registerUser` in `authService.js` (Cognito SignUp + DynamoDB row)
+- [x] Rewrite `loginUser` in `authService.js` (Cognito InitiateAuth)
+- [x] Rewrite `authenticate()` middleware (JWKS verification via `aws-jwt-verify`)
+- [x] Rewrite `deleteUserAccount` (AdminDeleteUser)
+- [x] Pre-create + confirm test account, add to `moderators` group
 
 ### Phase 2 — Data: DynamoDB
 
-- [ ] Create 6 DynamoDB tables with partition key `id`
-- [ ] Enable PITR with 7-day retention on every table
-- [ ] Rewrite `userModel.js` to use DynamoDB Document Client
-- [ ] Rewrite `postModel.js`
-- [ ] Rewrite `commentModel.js`
-- [ ] Rewrite `likeModel.js`
-- [ ] Rewrite `followModel.js`
-- [ ] Rewrite `momentModel.js`
-- [ ] Delete `src/config/database.js` + `db.json`
-- [ ] Add GSIs / bounded scans for search, feed, and follower/following queries
+- [x] Create 6 DynamoDB tables with partition key `id`
+- [x] Enable PITR with 7-day retention on every table
+- [x] Rewrite `userModel.js` to use DynamoDB Document Client
+- [x] Rewrite `postModel.js`
+- [x] Rewrite `commentModel.js`
+- [x] Rewrite `likeModel.js`
+- [x] Rewrite `followModel.js`
+- [x] Rewrite `momentModel.js`
+- [x] Delete `src/config/database.js` + `db.json`
+- [x] Add GSIs / bounded scans for search, feed, and follower/following queries
 
 ### Phase 3 — Storage: S3 presigned access
 
-- [ ] Create private S3 bucket, block all public access
-- [ ] Rewrite `uploadService.js`/`uploadController.js` for presigned PUT (≤ 5 min expiry)
-- [ ] Drop multer middleware + static `/uploads` serving
-- [ ] Rewrite `enrichment.js` for presigned GET URLs at read time
+- [x] Create private S3 bucket, block all public access
+- [x] Rewrite `uploadService.js`/`uploadController.js` for presigned PUT (≤ 5 min expiry)
+- [x] Drop multer middleware + static `/uploads` serving
+- [x] Rewrite `enrichment.js` for presigned GET URLs at read time
+- [ ] ⚠️ Update Strobe Web frontend for the new upload flow (see flag in Phase 3 section below)
 
 ### Phase 4 — Compute: Lambda-ise the controllers
 
@@ -97,7 +98,7 @@ Check items off as you complete and verify them. Mirrors the phases in section 2
 Browser (Strobe Web)
    │  HTTPS
    ▼
-Route 53  (n<studentID>.cab432.com)
+Route 53  (n12191434.cab432.com)
    │
    ▼
 ACM certificate (TLS ≥1.2)
@@ -161,6 +162,8 @@ Six Lambda functions (matching the **controller** column of the route table — 
 - Rewrite `src/services/uploadService.js` / `src/controllers/uploadController.js`: replace `multer` disk storage with `POST /v1/uploads/url` issuing a presigned `PutObjectCommand` URL scoped to a specific key (e.g. `{userId}/{uuid}.jpg`), **expiring in ≤5 minutes** (US7 first bullet). The client uploads directly to S3 with this URL — no AWS credentials ever reach the browser.
 - Drop `src/middleware/upload.js` (multer) and the static `/uploads` file serving in `src/index.js` — images are no longer served from local disk.
 - Rewrite `src/utils/enrichment.js` so post/moment image fields are resolved to **presigned GET URLs at read time** (short expiry, e.g. 5–15 min) rather than the permanent `http://localhost:3000/uploads/...` links currently stored — DynamoDB should store the **S3 key**, not a public URL (US8 third bullet, US9 second bullet).
+
+> **⚠️ Flag — frontend not yet updated.** `POST /v1/uploads/url` now returns an extra `key` field alongside `uploadUrl`/`fileId`, and accepts an optional `contentType` in the request body. The old `PUT /v1/uploads/:userId/:postId/:fileId` route is gone — the client must `PUT` the file bytes directly to the presigned `uploadUrl` (straight to S3, with a matching `Content-Type` header) instead of to our server, then send the returned `key` (not a URL) back in `images`/`imageUrl` when creating a post or moment. Strobe Web (`CAB432-Strobe-Web-1.0.0`) still assumes the old server-relayed upload flow and has not been touched — update it before Phase 6 end-to-end testing, or the upload flow will break in the browser even though the API itself works (verified directly against S3).
 
 ### Phase 4 — Compute: Lambda-ise the controllers (User Story 10, supports all)
 

@@ -19,9 +19,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
-// Serve uploaded files
-app.use("/uploads", express.static(config.uploadsDir));
-
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });

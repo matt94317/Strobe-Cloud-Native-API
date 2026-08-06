@@ -3,6 +3,7 @@ import * as likeModel from "../models/likeModel.js";
 import * as commentModel from "../models/commentModel.js";
 import * as followModel from "../models/followModel.js";
 import * as postModel from "../models/postModel.js";
+import { getReadUrl } from "../services/uploadService.js";
 
 /**
  * Enrich a post with likes count and comments count
@@ -25,9 +26,13 @@ export async function enrichPost(post, currentUserId = null) {
   }
 
   const authorRecord = await userModel.findUserById(post.userId);
+  const images = await Promise.all(
+    (post.images || []).map((key) => getReadUrl(key)),
+  );
 
   return {
     ...post,
+    images,
     author: authorRecord
       ? { id: authorRecord.id, username: authorRecord.username }
       : null,
@@ -89,4 +94,27 @@ export async function enrichUser(user, currentUserId = null) {
  */
 export async function enrichUsers(users, currentUserId = null) {
   return Promise.all(users.map((user) => enrichUser(user, currentUserId)));
+}
+
+/**
+ * Enrich a moment by resolving its stored S3 key to a presigned GET URL
+ * @param {Object} moment - Moment object
+ * @returns {Promise<Object>} Enriched moment
+ */
+export async function enrichMoment(moment) {
+  if (!moment) return null;
+
+  return {
+    ...moment,
+    imageUrl: await getReadUrl(moment.imageUrl),
+  };
+}
+
+/**
+ * Enrich multiple moments
+ * @param {Array} moments - Array of moment objects
+ * @returns {Promise<Array>} Array of enriched moments
+ */
+export async function enrichMoments(moments) {
+  return Promise.all(moments.map((moment) => enrichMoment(moment)));
 }

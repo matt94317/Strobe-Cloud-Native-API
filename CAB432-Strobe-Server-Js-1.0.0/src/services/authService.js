@@ -1,6 +1,4 @@
 import * as userModel from "../models/userModel.js";
-import fs from "fs/promises";
-import path from "path";
 import jwt from "jsonwebtoken";
 import {
   AdminCreateUserCommand,
@@ -236,7 +234,4 @@ export async function deleteUserAccount(authenticatedUserId, targetUserId) {
       Username: existingUser.email,
     }),
   );
-
-  const userUploadsDir = path.join(config.uploadsDir, targetUserId);
-  await fs.rm(userUploadsDir, { recursive: true, force: true });
 }

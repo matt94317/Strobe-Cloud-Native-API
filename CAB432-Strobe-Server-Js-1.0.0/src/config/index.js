@@ -26,8 +26,6 @@ const {
   HOST = "0.0.0.0",
   NODE_ENV = "development",
   JWT_SECRET = "dev-secret-change-in-production",
-  UPLOADS_DIR = "uploads",
-  PUBLIC_BASE_URL = "",
   AWS_REGION = "ap-southeast-2",
   COGNITO_USER_POOL_ID = "",
   COGNITO_CLIENT_ID = "",
@@ -37,17 +35,14 @@ const {
   DDB_TABLE_LIKES = "n12191434-ddb-likes",
   DDB_TABLE_FOLLOWS = "n12191434-ddb-follows",
   DDB_TABLE_MOMENTS = "n12191434-ddb-moments",
+  S3_MEDIA_BUCKET = "n12191434-strobe-media",
 } = process.env;
-
-const normalisedPublicBaseUrl = PUBLIC_BASE_URL.trim().replace(/\/$/, "");
 
 export const config = {
   port: Number(PORT),
   host: HOST,
   nodeEnv: NODE_ENV,
   jwtSecret: JWT_SECRET,
-  uploadsDir: UPLOADS_DIR,
-  publicBaseUrl: normalisedPublicBaseUrl,
   awsRegion: AWS_REGION,
   cognito: {
     region: AWS_REGION,
@@ -64,11 +59,7 @@ export const config = {
       moments: DDB_TABLE_MOMENTS,
     },
   },
+  s3: {
+    mediaBucket: S3_MEDIA_BUCKET,
+  },
 };
-
-export function toPublicUrl(pathname = "") {
-  if (!config.publicBaseUrl) return pathname;
-  if (!pathname) return config.publicBaseUrl;
-  const suffix = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  return `${config.publicBaseUrl}${suffix}`;
-}

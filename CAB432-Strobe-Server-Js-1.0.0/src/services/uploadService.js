@@ -1,35 +1,19 @@
-import path from "path";
-import fs from "fs/promises";
-import { config, toPublicUrl } from "../config/index.js";
-import { generateShortId } from "../utils/idGenerator.js";
+import {
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3Client } from "../config/s3Client.js";
+import { config } from "../config/index.js";
+import { generateId } from "../utils/idGenerator.js";
 import { validationError } from "../middleware/errorHandler.js";
 
 // Allowed file types
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-/**
- * Validate file before upload
- * @param {Object} file - File object { mimetype, size, buffer }
- * @returns {Object} { valid: boolean, error: string|null }
- */
-function validateFile(file) {
-  if (!ALLOWED_TYPES.includes(file.mimetype)) {
-    return {
-      valid: false,
-      error: "Invalid file type. Allowed: JPEG, PNG, GIF, WebP",
-    };
-  }
-
-  if (file.size > MAX_FILE_SIZE) {
-    return {
-      valid: false,
-      error: `File too large. Maximum size: ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
-    };
-  }
-
-  return { valid: true, error: null };
-}
+const UPLOAD_URL_EXPIRY_SECONDS = 5 * 60; // presigned PUT: ≤5 min
+const READ_URL_EXPIRY_SECONDS = 10 * 60; // presigned GET: short-lived, resolved at read time
 
 /**
  * Get file extension from mimetype
@@ -47,104 +31,61 @@ function getFileExtension(mimetype) {
 }
 
 /**
- * Generate an upload URL
+ * Generate a presigned S3 PUT URL for a client to upload directly to
  *
  * @param {string} userId - User ID (for organisation)
  * @param {string} postId - Post ID (for organisation)
- * @returns {Promise<Object>} { url, fileId }
+ * @param {string} contentType - MIME type of the file being uploaded
+ * @returns {Promise<Object>} { url, fileId, key }
  */
-export async function getUploadUrl(userId, postId) {
+export async function getUploadUrl(userId, postId, contentType = "image/jpeg") {
   if (!postId) {
     throw validationError("postId is required to generate an upload URL");
   }
 
-  const fileId = generateShortId();
-  const uploadUrl = `/v1/uploads/${userId}/${postId}/${fileId}`;
-
-  return {
-    url: toPublicUrl(uploadUrl),
-    fileId,
-  };
-}
-
-/**
- * Store uploaded file locally
- * Called when file is PUT to the URL from getUploadUrl
- *
- * @param {string} userId - User ID
- * @param {string} postId - Post ID
- * @param {string} fileId - File ID from upload URL
- * @param {Object} file - File object { mimetype, size, buffer }
- * @returns {Promise<Object>} { fileId, url, size, mimetype }
- */
-export async function storeUploadedFile(userId, postId, fileId, file) {
-  // Validate file
-  const validation = validateFile(file);
-  if (!validation.valid) {
-    throw validationError(validation.error);
+  if (!ALLOWED_TYPES.includes(contentType)) {
+    throw validationError("Invalid file type. Allowed: JPEG, PNG, GIF, WebP");
   }
 
-  // Ensure uploads directory exists
-  await fs.mkdir(config.uploadsDir, { recursive: true });
+  const fileId = generateId();
+  const key = `${userId}/${postId}/${fileId}.${getFileExtension(contentType)}`;
 
-  // Create file path
-  const extension = getFileExtension(file.mimetype);
-  const filename = `${fileId}.${extension}`;
-  const relativeDir = path.join(userId, postId);
-  const fullDir = path.join(config.uploadsDir, relativeDir);
-  await fs.mkdir(fullDir, { recursive: true });
-  const filepath = path.join(fullDir, filename);
+  const url = await getSignedUrl(
+    s3Client,
+    new PutObjectCommand({
+      Bucket: config.s3.mediaBucket,
+      Key: key,
+      ContentType: contentType,
+    }),
+    { expiresIn: UPLOAD_URL_EXPIRY_SECONDS },
+  );
 
-  // Save file
-  await fs.writeFile(filepath, file.buffer);
-
-  // Return file info
-  return {
-    fileId,
-    url: toPublicUrl(`/uploads/${userId}/${postId}/${filename}`),
-    size: file.size,
-    mimetype: file.mimetype,
-  };
+  return { url, fileId, key };
 }
 
 /**
- * Delete uploaded file
- * @param {string} fileId - File ID
- * @returns {Promise<boolean>} True if deleted
+ * Resolve a stored S3 key to a short-lived presigned GET URL
+ * @param {string} key - S3 object key
+ * @returns {Promise<string>} Presigned URL
  */
-export async function deleteUploadedFile(fileId) {
-  try {
-    const uploadsPath = config.uploadsDir;
-    const userDirs = await fs.readdir(uploadsPath);
-
-    for (const userDir of userDirs) {
-      const userPath = path.join(uploadsPath, userDir);
-      const postDirs = await fs.readdir(userPath);
-
-      for (const postDir of postDirs) {
-        const postPath = path.join(userPath, postDir);
-        const files = await fs.readdir(postPath);
-
-        for (const file of files) {
-          if (file.startsWith(fileId)) {
-            await fs.unlink(path.join(postPath, file));
-            return true;
-          }
-        }
-      }
-    }
-
-    return false;
-  } catch (error) {
-    return false;
-  }
+export async function getReadUrl(key) {
+  return getSignedUrl(
+    s3Client,
+    new GetObjectCommand({ Bucket: config.s3.mediaBucket, Key: key }),
+    { expiresIn: READ_URL_EXPIRY_SECONDS },
+  );
 }
 
 /**
- * Get file URL (for serving uploaded files)
- * @param {string} fileId - File ID
- * @returns {string} URL to access the file
+ * Delete an uploaded file from S3
+ * @param {string} key - S3 object key
+ * @returns {Promise<boolean>} True if the delete call was issued
  */
-export function getFileUrl(fileId) {
-  return `/uploads/${fileId}`;
+export async function deleteUploadedFile(key) {
+  if (!key) return false;
+
+  await s3Client.send(
+    new DeleteObjectCommand({ Bucket: config.s3.mediaBucket, Key: key }),
+  );
+  return true;
 }

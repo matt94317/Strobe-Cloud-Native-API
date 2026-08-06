@@ -7,6 +7,7 @@ import * as momentModel from "../models/momentModel.js";
 import * as followModel from "../models/followModel.js";
 import * as userModel from "../models/userModel.js";
 import { generateId } from "../utils/idGenerator.js";
+import { enrichMoment, enrichMoments } from "../utils/enrichment.js";
 import {
   validationError,
   notFoundError,
@@ -79,7 +80,7 @@ export async function createMoment(userId, payload) {
     updatedAt: now,
   });
 
-  return moment;
+  return enrichMoment(moment);
 }
 
 /**
@@ -109,7 +110,7 @@ export async function getMomentFeed(userId, viewerRole = ROLES.USER) {
     }
   }
 
-  return visibleMoments;
+  return enrichMoments(visibleMoments);
 }
 
 /**
@@ -139,7 +140,7 @@ export async function getMomentArchive(userId, viewerRole = ROLES.USER) {
     }
   }
 
-  return visibleMoments;
+  return enrichMoments(visibleMoments);
 }
 
 /**
@@ -159,11 +160,13 @@ export async function hideMoment(momentId, moderatorId, moderatorRole) {
     throw notFoundError("Moment not found");
   }
 
-  return momentModel.updateMoment(momentId, {
+  const updated = await momentModel.updateMoment(momentId, {
     status: "hidden",
     hiddenBy: moderatorId,
     hiddenAt: new Date().toISOString(),
   });
+
+  return enrichMoment(updated);
 }
 
 /**
