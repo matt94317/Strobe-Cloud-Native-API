@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import { config } from "./config/index.js";
-import { initialiseDatabase } from "./config/database.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 import authRoutes from "./routes/authRoutes.js";
@@ -50,7 +49,6 @@ app.use(errorHandler);
 
 async function start() {
   try {
-    await initialiseDatabase();
     app.listen(config.port, config.host, () => {
       const displayHost = config.host === "0.0.0.0" ? "localhost" : config.host;
       console.log(`Server is now running at http://${displayHost}:${config.port}`);

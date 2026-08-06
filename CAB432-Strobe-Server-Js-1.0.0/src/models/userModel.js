@@ -1,11 +1,12 @@
-import { getDatabase, saveDatabase } from "../config/database.js";
+import * as postModel from "./postModel.js";
+import * as commentModel from "./commentModel.js";
+import * as likeModel from "./likeModel.js";
+import * as followModel from "./followModel.js";
+import * as momentModel from "./momentModel.js";
+import { getById, putItem, updateById, deleteById, scanAll } from "../utils/dynamoHelpers.js";
+import { config } from "../config/index.js";
 
-function sanitizeUser(user) {
-  if (!user) return null;
-  const safeUser = { ...user };
-  delete safeUser.password;
-  return safeUser;
-}
+const TABLE_NAME = config.dynamo.tables.users;
 
 /**
  * Find a user by ID
@@ -13,9 +14,7 @@ function sanitizeUser(user) {
  * @returns {Object|null} User object or null
  */
 export async function findUserById(userId) {
-  const db = getDatabase();
-  const user = db.data.users.find((u) => u.id === userId) || null;
-  return sanitizeUser(user);
+  return getById(TABLE_NAME, userId);
 }
 
 /**
@@ -24,9 +23,12 @@ export async function findUserById(userId) {
  * @returns {Object|null} User object or null
  */
 export async function findUserAuthByEmail(email) {
-  const db = getDatabase();
   const needle = (email || "").trim().toLowerCase();
-  return db.data.users.find((u) => (u.email || "").toLowerCase() === needle) || null;
+  const items = await scanAll(TABLE_NAME, {
+    FilterExpression: "email = :email",
+    ExpressionAttributeValues: { ":email": needle },
+  });
+  return items[0] || null;
 }
 
 /**
@@ -34,22 +36,16 @@ export async function findUserAuthByEmail(email) {
  * @returns {Array} Array of user objects
  */
 export async function getAllUsers() {
-  const db = getDatabase();
-  return db.data.users.map(sanitizeUser);
+  return scanAll(TABLE_NAME);
 }
 
 /**
  * Create a new user
- * @param {Object} userData - User data { id, username, email, password, createdAt }
+ * @param {Object} userData - User data { id, username, email, createdAt }
  * @returns {Object} Created user object
  */
 export async function createUser(userData) {
-  const db = getDatabase();
-  db.data.users.push(userData);
-  await saveDatabase();
-
-  // Return user without password
-  return sanitizeUser(userData);
+  return putItem(TABLE_NAME, userData);
 }
 
 /**
@@ -59,15 +55,10 @@ export async function createUser(userData) {
  * @returns {Object|null} Updated user object or null if not found
  */
 export async function updateUser(userId, updates) {
-  const db = getDatabase();
-  const user = db.data.users.find((u) => u.id === userId);
-
-  if (!user) return null;
-
-  Object.assign(user, updates, { updatedAt: new Date().toISOString() });
-  await saveDatabase();
-
-  return sanitizeUser(user);
+  return updateById(TABLE_NAME, userId, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 /**
@@ -76,14 +67,7 @@ export async function updateUser(userId, updates) {
  * @returns {boolean} True if user was deleted, false if not found
  */
 export async function deleteUser(userId) {
-  const db = getDatabase();
-  const index = db.data.users.findIndex((u) => u.id === userId);
-
-  if (index === -1) return false;
-
-  db.data.users.splice(index, 1);
-  await saveDatabase();
-  return true;
+  return deleteById(TABLE_NAME, userId);
 }
 
 /**
@@ -92,29 +76,26 @@ export async function deleteUser(userId) {
  * @returns {boolean} True if user was deleted, false if not found
  */
 export async function deleteUserWithCascade(userId) {
-  const db = getDatabase();
-  const userExists = db.data.users.some((u) => u.id === userId);
+  const existing = await findUserById(userId);
+  if (!existing) return false;
 
-  if (!userExists) return false;
-
-  const ownedPostIds = db.data.posts
-    .filter((p) => p.userId === userId)
-    .map((p) => p.id);
-
-  db.data.posts = db.data.posts.filter((p) => p.userId !== userId);
-  db.data.comments = db.data.comments.filter(
-    (c) => c.userId !== userId && !ownedPostIds.includes(c.postId),
+  const ownedPosts = await postModel.getPostsByUserId(
+    userId,
+    Number.MAX_SAFE_INTEGER,
+    0,
   );
-  db.data.likes = db.data.likes.filter(
-    (l) => l.userId !== userId && !ownedPostIds.includes(l.postId),
-  );
-  db.data.follows = db.data.follows.filter(
-    (f) => f.followerId !== userId && f.followeeId !== userId,
-  );
-  db.data.moments = db.data.moments.filter((m) => m.userId !== userId);
-  db.data.users = db.data.users.filter((u) => u.id !== userId);
+  for (const post of ownedPosts) {
+    await likeModel.removeLikesByPostId(post.id);
+    await commentModel.deleteCommentsByPostId(post.id);
+    await postModel.deletePost(post.id);
+  }
 
-  await saveDatabase();
+  await commentModel.deleteCommentsByUserId(userId);
+  await likeModel.removeLikesByUserId(userId);
+  await followModel.removeFollowsByUserId(userId);
+  await momentModel.deleteMomentsByUserId(userId);
+
+  await deleteUser(userId);
   return true;
 }
 
@@ -124,8 +105,12 @@ export async function deleteUserWithCascade(userId) {
  * @returns {boolean} True if username exists
  */
 export async function usernameExists(username) {
-  const db = getDatabase();
-  return db.data.users.some((u) => u.username === username);
+  const items = await scanAll(TABLE_NAME, {
+    FilterExpression: "username = :username",
+    ExpressionAttributeValues: { ":username": username },
+    ProjectionExpression: "id",
+  });
+  return items.length > 0;
 }
 
 /**
@@ -134,9 +119,13 @@ export async function usernameExists(username) {
  * @returns {boolean} True if email exists
  */
 export async function emailExists(email) {
-  const db = getDatabase();
   const needle = (email || "").trim().toLowerCase();
-  return db.data.users.some((u) => (u.email || "").toLowerCase() === needle);
+  const items = await scanAll(TABLE_NAME, {
+    FilterExpression: "email = :email",
+    ExpressionAttributeValues: { ":email": needle },
+    ProjectionExpression: "id",
+  });
+  return items.length > 0;
 }
 
 /**
@@ -146,13 +135,9 @@ export async function emailExists(email) {
  * @returns {Array} Array of matching users
  */
 export async function searchUsers(query, limit = 10) {
-  const db = getDatabase();
-  const lowerQuery = query.toLowerCase();
-
-  return db.data.users
-    .filter((u) => u.username.toLowerCase().includes(lowerQuery))
-    .slice(0, limit)
-    .map((user) => {
-      return sanitizeUser(user);
-    });
+  const lowerQuery = (query || "").toLowerCase();
+  const items = await scanAll(TABLE_NAME);
+  return items
+    .filter((u) => (u.username || "").toLowerCase().includes(lowerQuery))
+    .slice(0, limit);
 }

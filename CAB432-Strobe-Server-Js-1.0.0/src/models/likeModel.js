@@ -1,4 +1,14 @@
-import { getDatabase, saveDatabase } from "../config/database.js";
+import {
+  putItem,
+  deleteById,
+  scanAll,
+  queryAll,
+  queryCount,
+} from "../utils/dynamoHelpers.js";
+import { config } from "../config/index.js";
+
+const TABLE_NAME = config.dynamo.tables.likes;
+const POST_USER_INDEX = "postId-userId-index";
 
 /**
  * Find a like by post and user
@@ -7,11 +17,12 @@ import { getDatabase, saveDatabase } from "../config/database.js";
  * @returns {Object|null} Like object or null
  */
 export async function findLike(postId, userId) {
-  const db = getDatabase();
-  return (
-    db.data.likes.find((l) => l.postId === postId && l.userId === userId) ||
-    null
-  );
+  const items = await queryAll(TABLE_NAME, {
+    IndexName: POST_USER_INDEX,
+    KeyConditionExpression: "postId = :postId AND userId = :userId",
+    ExpressionAttributeValues: { ":postId": postId, ":userId": userId },
+  });
+  return items[0] || null;
 }
 
 /**
@@ -21,8 +32,7 @@ export async function findLike(postId, userId) {
  * @returns {boolean} True if user has liked the post
  */
 export async function hasUserLikedPost(postId, userId) {
-  const db = getDatabase();
-  return db.data.likes.some((l) => l.postId === postId && l.userId === userId);
+  return (await findLike(postId, userId)) !== null;
 }
 
 /**
@@ -31,8 +41,11 @@ export async function hasUserLikedPost(postId, userId) {
  * @returns {number} Number of likes
  */
 export async function getLikeCountByPostId(postId) {
-  const db = getDatabase();
-  return db.data.likes.filter((l) => l.postId === postId).length;
+  return queryCount(TABLE_NAME, {
+    IndexName: POST_USER_INDEX,
+    KeyConditionExpression: "postId = :postId",
+    ExpressionAttributeValues: { ":postId": postId },
+  });
 }
 
 /**
@@ -41,10 +54,7 @@ export async function getLikeCountByPostId(postId) {
  * @returns {Object} Created like object
  */
 export async function createLike(likeData) {
-  const db = getDatabase();
-  db.data.likes.push(likeData);
-  await saveDatabase();
-  return likeData;
+  return putItem(TABLE_NAME, likeData);
 }
 
 /**
@@ -54,16 +64,9 @@ export async function createLike(likeData) {
  * @returns {boolean} True if like was removed, false if not found
  */
 export async function removeLike(postId, userId) {
-  const db = getDatabase();
-  const index = db.data.likes.findIndex(
-    (l) => l.postId === postId && l.userId === userId,
-  );
-
-  if (index === -1) return false;
-
-  db.data.likes.splice(index, 1);
-  await saveDatabase();
-  return true;
+  const like = await findLike(postId, userId);
+  if (!like) return false;
+  return deleteById(TABLE_NAME, like.id);
 }
 
 /**
@@ -72,7 +75,25 @@ export async function removeLike(postId, userId) {
  * @returns {void}
  */
 export async function removeLikesByPostId(postId) {
-  const db = getDatabase();
-  db.data.likes = db.data.likes.filter((l) => l.postId !== postId);
-  await saveDatabase();
+  const items = await queryAll(TABLE_NAME, {
+    IndexName: POST_USER_INDEX,
+    KeyConditionExpression: "postId = :postId",
+    ExpressionAttributeValues: { ":postId": postId },
+    ProjectionExpression: "id",
+  });
+  await Promise.all(items.map((l) => deleteById(TABLE_NAME, l.id)));
+}
+
+/**
+ * Remove all likes made by a user (when the user is deleted)
+ * @param {string} userId - The user's ID
+ * @returns {void}
+ */
+export async function removeLikesByUserId(userId) {
+  const items = await scanAll(TABLE_NAME, {
+    FilterExpression: "userId = :userId",
+    ExpressionAttributeValues: { ":userId": userId },
+    ProjectionExpression: "id",
+  });
+  await Promise.all(items.map((l) => deleteById(TABLE_NAME, l.id)));
 }

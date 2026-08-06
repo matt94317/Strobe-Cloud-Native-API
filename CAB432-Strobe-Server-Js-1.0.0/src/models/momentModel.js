@@ -1,4 +1,14 @@
-import { getDatabase, saveDatabase } from "../config/database.js";
+import {
+  getById,
+  putItem,
+  updateById,
+  deleteById,
+  queryAll,
+} from "../utils/dynamoHelpers.js";
+import { config } from "../config/index.js";
+
+const TABLE_NAME = config.dynamo.tables.moments;
+const USER_INDEX = "userId-createdAt-index";
 
 function sortByNewestFirst(items) {
   return items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -10,10 +20,7 @@ function sortByNewestFirst(items) {
  * @returns {Object} Created moment object
  */
 export async function createMoment(momentData) {
-  const db = getDatabase();
-  db.data.moments.push(momentData);
-  await saveDatabase();
-  return momentData;
+  return putItem(TABLE_NAME, momentData);
 }
 
 /**
@@ -22,8 +29,7 @@ export async function createMoment(momentData) {
  * @returns {Object|null} Moment object or null
  */
 export async function findMomentById(momentId) {
-  const db = getDatabase();
-  return db.data.moments.find((m) => m.id === momentId) || null;
+  return getById(TABLE_NAME, momentId);
 }
 
 /**
@@ -33,14 +39,10 @@ export async function findMomentById(momentId) {
  * @returns {Object|null} Updated moment object or null if not found
  */
 export async function updateMoment(momentId, updates) {
-  const db = getDatabase();
-  const moment = db.data.moments.find((m) => m.id === momentId);
-
-  if (!moment) return null;
-
-  Object.assign(moment, updates, { updatedAt: new Date().toISOString() });
-  await saveDatabase();
-  return moment;
+  return updateById(TABLE_NAME, momentId, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 /**
@@ -49,14 +51,7 @@ export async function updateMoment(momentId, updates) {
  * @returns {boolean} True if moment was deleted, false if not found
  */
 export async function deleteMoment(momentId) {
-  const db = getDatabase();
-  const index = db.data.moments.findIndex((m) => m.id === momentId);
-
-  if (index === -1) return false;
-
-  db.data.moments.splice(index, 1);
-  await saveDatabase();
-  return true;
+  return deleteById(TABLE_NAME, momentId);
 }
 
 /**
@@ -65,9 +60,17 @@ export async function deleteMoment(momentId) {
  * @returns {Array} Array of moment objects sorted newest first
  */
 export async function getMomentsByUserIds(userIds) {
-  const db = getDatabase();
-  const moments = db.data.moments.filter((m) => userIds.includes(m.userId));
-  return sortByNewestFirst(moments);
+  if (userIds.length === 0) return [];
+  const results = await Promise.all(
+    userIds.map((userId) =>
+      queryAll(TABLE_NAME, {
+        IndexName: USER_INDEX,
+        KeyConditionExpression: "userId = :userId",
+        ExpressionAttributeValues: { ":userId": userId },
+      }),
+    ),
+  );
+  return sortByNewestFirst(results.flat());
 }
 
 /**
@@ -76,7 +79,25 @@ export async function getMomentsByUserIds(userIds) {
  * @returns {Array} Array of moment objects sorted newest first
  */
 export async function getMomentsByUserId(userId) {
-  const db = getDatabase();
-  const moments = db.data.moments.filter((m) => m.userId === userId);
-  return sortByNewestFirst(moments);
+  return queryAll(TABLE_NAME, {
+    IndexName: USER_INDEX,
+    KeyConditionExpression: "userId = :userId",
+    ExpressionAttributeValues: { ":userId": userId },
+    ScanIndexForward: false,
+  });
+}
+
+/**
+ * Delete all moments for a user (when the user is deleted)
+ * @param {string} userId - The user's ID
+ * @returns {void}
+ */
+export async function deleteMomentsByUserId(userId) {
+  const items = await queryAll(TABLE_NAME, {
+    IndexName: USER_INDEX,
+    KeyConditionExpression: "userId = :userId",
+    ExpressionAttributeValues: { ":userId": userId },
+    ProjectionExpression: "id",
+  });
+  await Promise.all(items.map((m) => deleteById(TABLE_NAME, m.id)));
 }
