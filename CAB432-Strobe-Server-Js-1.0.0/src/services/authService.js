@@ -1,9 +1,15 @@
 import * as userModel from "../models/userModel.js";
 import fs from "fs/promises";
 import path from "path";
-import { generateId } from "../utils/idGenerator.js";
-import { hashPassword, comparePassword } from "../utils/password.js";
-import { generateToken } from "../middleware/auth.js";
+import jwt from "jsonwebtoken";
+import {
+  AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
+  AdminInitiateAuthCommand,
+  AdminDeleteUserCommand,
+  InitiateAuthCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import { cognitoClient } from "../config/cognitoClient.js";
 import {
   validationError,
   conflictError,
@@ -32,7 +38,7 @@ function normaliseEmail(value) {
 export async function registerUser(userData) {
   const { email, password, role } = userData;
   const normalisedEmail = normaliseEmail(email);
-  // Username is always set to match email (should match Cognito behaviour)
+  // Username is always set to match email (Cognito pool uses email as username/alias)
   const username = normalisedEmail;
 
   // Validate inputs
@@ -52,31 +58,75 @@ export async function registerUser(userData) {
     throw validationError(roleValidation.error);
   }
 
-  // Check if email already exists (email is the unique identifier)
-  if (await userModel.emailExists(normalisedEmail)) {
-    throw conflictError(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
+  // Cognito is the source of truth for uniqueness (email = username)
+  let cognitoSub;
+  try {
+    const created = await cognitoClient.send(
+      new AdminCreateUserCommand({
+        UserPoolId: config.cognito.userPoolId,
+        Username: normalisedEmail,
+        UserAttributes: [
+          { Name: "email", Value: normalisedEmail },
+          { Name: "email_verified", Value: "true" },
+        ],
+        MessageAction: "SUPPRESS",
+      }),
+    );
+    cognitoSub = created.User.Attributes.find((a) => a.Name === "sub").Value;
+
+    await cognitoClient.send(
+      new AdminSetUserPasswordCommand({
+        UserPoolId: config.cognito.userPoolId,
+        Username: normalisedEmail,
+        Password: password,
+        Permanent: true,
+      }),
+    );
+  } catch (err) {
+    if (err.name === "UsernameExistsException") {
+      throw conflictError(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
+    }
+    throw err;
   }
 
-  // Create user
-  const userId = generateId();
+  // Persist the app-level row using the Cognito sub as the durable id.
+  // Both the identity and the row must exist, or neither should.
   const now = new Date().toISOString();
-  const hashedPassword = await hashPassword(password);
+  let user;
+  try {
+    user = await userModel.createUser({
+      id: cognitoSub,
+      username,
+      email: normalisedEmail,
+      role: requestedRole,
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (err) {
+    await cognitoClient.send(
+      new AdminDeleteUserCommand({
+        UserPoolId: config.cognito.userPoolId,
+        Username: normalisedEmail,
+      }),
+    );
+    throw err;
+  }
 
-  const user = await userModel.createUser({
-    id: userId,
-    username,
-    email: normalisedEmail,
-    password: hashedPassword,
-    role: requestedRole,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  const token = generateToken(user);
+  const authResult = await cognitoClient.send(
+    new AdminInitiateAuthCommand({
+      UserPoolId: config.cognito.userPoolId,
+      ClientId: config.cognito.clientId,
+      AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+      AuthParameters: {
+        USERNAME: normalisedEmail,
+        PASSWORD: password,
+      },
+    }),
+  );
 
   return {
     user,
-    token,
+    token: authResult.AuthenticationResult.AccessToken,
   };
 }
 
@@ -94,24 +144,41 @@ export async function loginUser(credentials) {
     throw validationError(ERROR_MESSAGES.MISSING_REQUIRED_FIELDS);
   }
 
-  // Find user by email
-  const user = await userModel.findUserAuthByEmail(normalisedEmail);
+  let authResult;
+  try {
+    authResult = await cognitoClient.send(
+      new InitiateAuthCommand({
+        ClientId: config.cognito.clientId,
+        AuthFlow: "USER_PASSWORD_AUTH",
+        AuthParameters: {
+          USERNAME: normalisedEmail,
+          PASSWORD: password,
+        },
+      }),
+    );
+  } catch (err) {
+    if (
+      err.name === "NotAuthorizedException" ||
+      err.name === "UserNotFoundException"
+    ) {
+      throw unauthorisedError(ERROR_MESSAGES.INVALID_CREDENTIALS);
+    }
+    throw err;
+  }
+
+  const accessToken = authResult.AuthenticationResult.AccessToken;
+  // Decoding (not verifying) is safe here: the token was just issued to us
+  // directly by Cognito over TLS in this same call, not supplied by the client.
+  const { sub } = jwt.decode(accessToken);
+
+  const user = await userModel.findUserById(sub);
   if (!user) {
-    throw unauthorisedError(ERROR_MESSAGES.INVALID_CREDENTIALS);
+    throw notFoundError(ERROR_MESSAGES.USER_NOT_FOUND);
   }
-
-  // Check password
-  if (!(await comparePassword(password, user.password))) {
-    throw unauthorisedError(ERROR_MESSAGES.INVALID_CREDENTIALS);
-  }
-
-  const safeUser = { ...user };
-  delete safeUser.password;
-  const token = generateToken(safeUser);
 
   return {
-    user: safeUser,
-    token,
+    user,
+    token: accessToken,
   };
 }
 
@@ -162,6 +229,13 @@ export async function deleteUserAccount(authenticatedUserId, targetUserId) {
   }
 
   await userModel.deleteUserWithCascade(targetUserId);
+
+  await cognitoClient.send(
+    new AdminDeleteUserCommand({
+      UserPoolId: config.cognito.userPoolId,
+      Username: existingUser.email,
+    }),
+  );
 
   const userUploadsDir = path.join(config.uploadsDir, targetUserId);
   await fs.rm(userUploadsDir, { recursive: true, force: true });

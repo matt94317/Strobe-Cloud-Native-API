@@ -28,6 +28,9 @@ const {
   JWT_SECRET = "dev-secret-change-in-production",
   UPLOADS_DIR = "uploads",
   PUBLIC_BASE_URL = "",
+  AWS_REGION = "ap-southeast-2",
+  COGNITO_USER_POOL_ID = "",
+  COGNITO_CLIENT_ID = "",
 } = process.env;
 
 const normalisedPublicBaseUrl = PUBLIC_BASE_URL.trim().replace(/\/$/, "");
@@ -39,6 +42,12 @@ export const config = {
   jwtSecret: JWT_SECRET,
   uploadsDir: UPLOADS_DIR,
   publicBaseUrl: normalisedPublicBaseUrl,
+  awsRegion: AWS_REGION,
+  cognito: {
+    region: AWS_REGION,
+    userPoolId: COGNITO_USER_POOL_ID,
+    clientId: COGNITO_CLIENT_ID,
+  },
 };
 
 export function toPublicUrl(pathname = "") {

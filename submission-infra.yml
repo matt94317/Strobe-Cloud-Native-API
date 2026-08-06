@@ -36,8 +36,8 @@ cloudInfrastructure:
       arn: arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-upload
   metaData:
     qutUsernameTag: n12191434@qut.edu.au
-    testUsername: user@test.com
-    testPassword: SomeStr0ngPassword!
+    testUsername: n12191434.test@cab432.com
+    testPassword: 12191434
 studentDetail:
   studentID: n12191434
   studentFirstName: SHOAKUAN
