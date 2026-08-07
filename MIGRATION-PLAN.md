@@ -59,15 +59,15 @@ Check items off as you complete and verify them. Mirrors the phases in section 2
 
 ### Phase 4 — Compute: Lambda-ise the controllers
 
-- [ ] `auth` Lambda
-- [ ] `post` Lambda (post + comment routes)
-- [ ] `feed` Lambda
-- [ ] `user` Lambda (user + follow routes)
-- [ ] `upload` Lambda
-- [ ] `moment` Lambda
-- [ ] Wrap each with `serverless-http`/`serverless-express`
-- [ ] Per-function `package.json`/bundle
-- [ ] Remove `app.listen()` + local-disk assumptions from Lambda code paths
+- [x] `auth` Lambda
+- [x] `post` Lambda (post + comment routes)
+- [x] `feed` Lambda
+- [x] `user` Lambda (user + follow routes)
+- [x] `upload` Lambda
+- [x] `moment` Lambda
+- [x] Wrap each with `serverless-http`/`serverless-express`
+- [x] Per-function `package.json`/bundle
+- [x] Remove `app.listen()` + local-disk assumptions from Lambda code paths
 
 ### Phase 5 — Edge: API Gateway, Route 53, ACM
 

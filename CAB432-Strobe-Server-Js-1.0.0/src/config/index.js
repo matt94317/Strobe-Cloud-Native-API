@@ -2,8 +2,6 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
 
@@ -19,7 +17,16 @@ function loadEnvFile(filePath) {
   }
 }
 
-loadEnvFile(path.resolve(__dirname, "../../.env"));
+// Only meaningful for local dev - Lambda deployments never ship a .env file
+// and get real values injected as environment variables instead. Bundling
+// (esbuild -> CJS) strips import.meta.url down to `undefined`, so this must
+// tolerate that rather than crash the whole module on load.
+try {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  loadEnvFile(path.resolve(__dirname, "../../.env"));
+} catch {
+  // Not running from a real file URL (e.g. bundled for Lambda) - nothing to load.
+}
 
 const {
   PORT = "3000",

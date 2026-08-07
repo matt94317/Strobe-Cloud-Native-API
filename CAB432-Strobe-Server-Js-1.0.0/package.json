@@ -8,6 +8,7 @@
     "start": "node src/index.js",
     "dev": "nodemon --watch src --ext js,mjs,cjs,json src/index.js",
     "seed": "node src/scripts/seed.js",
+    "build:lambdas": "node scripts/build-lambdas.mjs",
     "lint": "eslint src",
     "test": "echo \"No automated tests configured\""
   },
@@ -24,9 +25,11 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "lowdb": "^4.0.1",
+    "serverless-http": "^4.0.0",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "esbuild": "^0.28.1",
     "eslint": "^8.50.0",
     "nodemon": "^3.0.1",
     "supertest": "^7.2.2"
