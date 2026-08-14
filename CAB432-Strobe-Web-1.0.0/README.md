@@ -7,6 +7,18 @@ With thanks to Jackson Riding for the development of Strobe Web.
 
 Strobe Web was forked from an open source repository by GitHub user yassinjouao, linked below.
 
+## Running the dev server
+
+```text
+npm run dev
+```
+
+```text
+http://localhost:5173
+```
+
+This is the web app itself. It's separate from the API base URL below, which is where the app sends its requests.
+
 ## API Base URL (Important)
 
 The client controls which backend API the browser calls.

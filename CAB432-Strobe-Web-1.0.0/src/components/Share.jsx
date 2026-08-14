@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import styled from "styled-components";
 import { MdPermMedia } from "react-icons/md";
 import { toast } from "sonner";
-import api, { resolveApiUrl } from "../api";
+import api from "../api";
 
 const MAX_FILES = 5;
 
@@ -64,79 +64,34 @@ function Share(props) {
         return;
       }
 
-      // 2. Upload each image sequentially and collect URLs
-      const uploadedImageUrls = [];
+      // 2. Upload each image directly to S3 via a presigned URL, collecting the S3 keys
+      const uploadedImageKeys = [];
       for (const selectedFile of files) {
-        const urlRes = await api.post(`/v1/uploads/url`, { postId });
-        const uploadUrl = resolveApiUrl(urlRes.data.uploadUrl);
-        const fallbackReadUrl = resolveApiUrl(
-          urlRes.data.fileUrl || urlRes.data.publicUrl || urlRes.data.url || ""
-        );
-        if (!uploadUrl) {
+        const contentType = selectedFile.type || "image/jpeg";
+        const urlRes = await api.post(`/v1/uploads/url`, { postId, contentType });
+        const uploadUrl = urlRes.data.uploadUrl;
+        const key = urlRes.data.key;
+        if (!uploadUrl || !key) {
           throw new Error("Upload URL is missing or invalid");
         }
 
-        const isPresignedUpload = /[?&]X-Amz-Algorithm=/i.test(uploadUrl);
-        const uploadRequest = isPresignedUpload
-          ? {
-              method: "PUT",
-              body: selectedFile,
-              headers: {
-                "Content-Type": selectedFile.type || "application/octet-stream",
-              },
-            }
-          : (() => {
-              const formData = new FormData();
-              formData.append("file", selectedFile);
-              return {
-                method: "PUT",
-                body: formData,
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem("strobe_token")}`,
-                },
-              };
-            })();
-
-        const uploadRes = await fetch(uploadUrl, uploadRequest);
+        const uploadRes = await fetch(uploadUrl, {
+          method: "PUT",
+          body: selectedFile,
+          headers: { "Content-Type": contentType },
+        });
 
         if (!uploadRes.ok) {
           const uploadErrText = await uploadRes.text().catch(() => "");
-          let uploadErr = null;
-          try {
-            uploadErr = uploadErrText ? JSON.parse(uploadErrText) : null;
-          } catch {
-            uploadErr = null;
-          }
-          throw new Error(uploadErr?.message || uploadErr?.error || uploadErrText || "Failed to upload image");
+          throw new Error(uploadErrText || "Failed to upload image");
         }
 
-        let uploadedPath = null;
-        if (isPresignedUpload) {
-          // Presigned PUT uploads commonly return 200/204 with an empty body.
-          uploadedPath = fallbackReadUrl || uploadUrl.split("?")[0];
-        } else {
-          const uploadContentType = uploadRes.headers.get("content-type") || "";
-          const uploadedFile = uploadContentType.includes("application/json")
-            ? await uploadRes.json().catch(() => null)
-            : null;
-          uploadedPath = uploadedFile?.file?.url || uploadedFile?.url || null;
-        }
-
-        if (!uploadedPath) {
-          throw new Error("Upload did not return an image URL");
-        }
-
-        const imageUrl = resolveApiUrl(uploadedPath);
-        if (!imageUrl) {
-          throw new Error("Uploaded image URL is invalid");
-        }
-
-        uploadedImageUrls.push(imageUrl);
+        uploadedImageKeys.push(key);
       }
 
-      // 3. Update post with all image URLs
+      // 3. Update post with the uploaded S3 keys (resolved to read URLs server-side)
       await api.put(`/v1/posts/${postId}`, {
-        images: uploadedImageUrls,
+        images: uploadedImageKeys,
       });
 
       toast.success("Post created successfully!");

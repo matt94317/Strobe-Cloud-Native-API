@@ -6,17 +6,21 @@ info:
     name: CAB432 Teaching Team
     email: cab432@qut.edu.au
   description: |
-    Local OpenAPI specification for the Strobe server.
+    OpenAPI specification for the Strobe server, reflecting the request and response shapes
+    implemented in `server/src` after migration to the AWS serverless stack (Cognito, DynamoDB,
+    S3, Lambda, API Gateway).
 
-    This spec is designed for direct import into Insomnia or other API clients and reflects
-    the request and response shapes implemented by the Express server in `server/src`.
-
-    Authentication uses JWT bearer tokens. Register or log in first, then send:
+    Authentication uses Cognito-issued bearer access tokens. Register or log in first, then send:
 
     `Authorization: Bearer <token>`
+
+    Switch the active server below to point requests at your deployed API Gateway domain or at
+    a local dev server.
 servers:
+  - url: https://n12191434.cab432.com
+    description: Deployed AWS stack (API Gateway custom domain)
   - url: http://localhost:3000
-    description: Local development server
+    description: Local development server (same Cognito/DynamoDB/S3 resources via .env)
 tags:
   - name: System
     description: Health and operational checks
@@ -43,7 +47,9 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Enter the JWT token only. Do not include the "Bearer " prefix.
+      description: |
+        Enter the Cognito access token returned by register/login only. Do not include the
+        "Bearer " prefix.
 
   parameters:
     IdParam:
@@ -78,14 +84,6 @@ components:
       schema:
         type: string
         example: comment_12345678
-    FileIdParam:
-      in: path
-      name: fileId
-      required: true
-      description: File identifier returned by POST /v1/uploads/url.
-      schema:
-        type: string
-        example: 5f9439f1
     QueryLimit:
       in: query
       name: limit
@@ -236,10 +234,13 @@ components:
           example: Cold start, good coffee, and an empty river path.
         images:
           type: array
+          description: |
+            Short-lived presigned S3 GET URLs (~10 min expiry), resolved server-side from the
+            stored object keys at read time. Do not persist these; re-fetch the post to refresh.
           items:
             type: string
           example:
-            - /uploads/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
+            - https://n12191434-strobe-media.s3.ap-southeast-2.amazonaws.com/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=600&...
         status:
           type: string
           enum: [active, hidden]
@@ -356,7 +357,10 @@ components:
           example: 550e8400-e29b-41d4-a716-446655440000
         imageUrl:
           type: string
-          example: /uploads/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
+          description: |
+            Short-lived presigned S3 GET URL (~10 min expiry), resolved server-side from the
+            stored object key at read time.
+          example: https://n12191434-strobe-media.s3.ap-southeast-2.amazonaws.com/550e8400-e29b-41d4-a716-446655440000/moment-1783417870915/5f9439f1.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=600&...
         caption:
           type: string
           example: Afternoon lab break.
@@ -390,23 +394,6 @@ components:
           format: date-time
           nullable: true
           example: null
-
-    UploadedFile:
-      type: object
-      required: [fileId, url, size, mimetype]
-      properties:
-        fileId:
-          type: string
-          example: 5f9439f1
-        url:
-          type: string
-          example: /uploads/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
-        size:
-          type: integer
-          example: 284193
-        mimetype:
-          type: string
-          example: image/jpeg
 
     RegisterRequest:
       type: object
@@ -450,10 +437,13 @@ components:
           example: Cold start, good coffee, and an empty river path.
         images:
           type: array
+          description: |
+            S3 object keys returned as `key` by POST /v1/uploads/url — not URLs. Upload each
+            file to its presigned uploadUrl first, then pass the returned keys here.
           items:
             type: string
           example:
-            - /uploads/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
+            - 550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
 
     UpdatePostRequest:
       type: object
@@ -466,10 +456,11 @@ components:
           example: Updated after the upload finished.
         images:
           type: array
+          description: S3 object keys, same as CreatePostRequest.images.
           items:
             type: string
           example:
-            - /uploads/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
+            - 550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
 
     CreateCommentRequest:
       type: object
@@ -485,7 +476,10 @@ components:
       properties:
         imageUrl:
           type: string
-          example: /uploads/550e8400-e29b-41d4-a716-446655440000/post_12345678/5f9439f1.jpg
+          description: |
+            S3 object key returned as `key` by POST /v1/uploads/url — not a URL. Upload the file
+            to its presigned uploadUrl first, then pass the returned key here.
+          example: 550e8400-e29b-41d4-a716-446655440000/moment-1783417870915/5f9439f1.jpg
         caption:
           type: string
           example: Afternoon lab break.
@@ -496,7 +490,15 @@ components:
       properties:
         postId:
           type: string
+          description: |
+            The target post's ID, or any unique placeholder (e.g. a moment ID) when uploading
+            for a moment rather than a post — used only to namespace the S3 object key.
           example: 660e8400-e29b-41d4-a716-446655440001
+        contentType:
+          type: string
+          description: MIME type of the file to be uploaded. Defaults to image/jpeg if omitted.
+          enum: [image/jpeg, image/png, image/gif, image/webp]
+          example: image/jpeg
 
     AuthResponse:
       type: object
@@ -621,27 +623,28 @@ components:
 
     UploadUrlResponse:
       type: object
-      required: [message, uploadUrl, fileId]
+      required: [message, uploadUrl, fileId, key]
       properties:
         message:
           type: string
           example: Success
         uploadUrl:
           type: string
-          example: /v1/uploads/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1
+          description: |
+            Presigned S3 PUT URL. PUT the raw file bytes here directly (not through this API),
+            with a Content-Type header matching the contentType sent in the request. Expires in
+            5 minutes.
+          example: https://n12191434-strobe-media.s3.ap-southeast-2.amazonaws.com/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=300&...
         fileId:
           type: string
           example: 5f9439f1
-
-    UploadFileResponse:
-      type: object
-      required: [message, file]
-      properties:
-        message:
+        key:
           type: string
-          example: Success
-        file:
-          $ref: "#/components/schemas/UploadedFile"
+          description: |
+            The S3 object key. Store this (not uploadUrl) in a post's images array or a moment's
+            imageUrl when creating/updating it — the API resolves it to a presigned GET URL at
+            read time.
+          example: 550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
 
     MessageResponse:
       type: object
@@ -1783,8 +1786,10 @@ paths:
       operationId: getUploadUrl
       summary: Get upload URL
       description: |
-        Generates a one-time local upload path for an authenticated user's post image.
-        The returned uploadUrl should then be used with PUT multipart form-data.
+        Generates a short-lived (5 min) presigned S3 PUT URL scoped to a single object, for an
+        authenticated user's post or moment image. The client PUTs the file bytes directly to
+        S3 using this URL — the file never passes through this API. The response's `key` field
+        is what gets stored back on the post/moment; `uploadUrl` is only for the S3 PUT itself.
       security:
         - bearerAuth: []
       requestBody:
@@ -1795,6 +1800,7 @@ paths:
               $ref: "#/components/schemas/UploadUrlRequest"
             example:
               postId: 660e8400-e29b-41d4-a716-446655440001
+              contentType: image/jpeg
       responses:
         "200":
           description: Upload URL generated.
@@ -1804,91 +1810,23 @@ paths:
                 $ref: "#/components/schemas/UploadUrlResponse"
               example:
                 message: Success
-                uploadUrl: /v1/uploads/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1
+                uploadUrl: https://n12191434-strobe-media.s3.ap-southeast-2.amazonaws.com/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=300&...
                 fileId: 5f9439f1
+                key: 550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
         "400":
-          description: postId missing from request body.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: ValidationError
-                message: postId is required to generate an upload URL
-        "401":
-          $ref: "#/components/responses/Unauthorised"
-
-  /v1/uploads/{userId}/{postId}/{fileId}:
-    put:
-      tags: [Uploads]
-      operationId: uploadFile
-      summary: Upload file
-      description: |
-        Uploads a single image using multipart form-data.
-
-        Requirements:
-        - Field name must be file
-        - Allowed MIME types: image/jpeg, image/png, image/gif, image/webp
-        - Maximum file size: 10 MB
-        - userId in the path must match the authenticated user
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/UserIdParam"
-        - $ref: "#/components/parameters/PostIdParam"
-        - $ref: "#/components/parameters/FileIdParam"
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties:
-                file:
-                  type: string
-                  format: binary
-      responses:
-        "200":
-          description: File stored locally and public URL returned.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UploadFileResponse"
-              example:
-                message: Success
-                file:
-                  fileId: 5f9439f1
-                  url: /uploads/550e8400-e29b-41d4-a716-446655440000/660e8400-e29b-41d4-a716-446655440001/5f9439f1.jpg
-                  size: 284193
-                  mimetype: image/jpeg
-        "400":
-          description: Missing file or invalid file payload.
+          description: postId missing, or contentType is not an allowed image MIME type.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
               examples:
-                missingFile:
+                missingPostId:
                   value:
                     error: ValidationError
-                    message: No file provided
+                    message: postId is required to generate an upload URL
                 invalidMime:
                   value:
                     error: ValidationError
                     message: "Invalid file type. Allowed: JPEG, PNG, GIF, WebP"
-                fileTooLarge:
-                  value:
-                    error: ValidationError
-                    message: "File too large. Maximum size: 10MB"
         "401":
           $ref: "#/components/responses/Unauthorised"
-        "403":
-          description: userId in the path does not match the authenticated user.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Forbidden
-                message: You can only upload files for your own user ID

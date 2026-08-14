@@ -4,7 +4,7 @@ cloudInfrastructure:
   apiGatewayExecutionARN: arn:aws:execute-api:ap-southeast-2:901444280953:t2vlrsyxc0
   apiGatewayStageARN: arn:aws:apigateway:ap-southeast-2::/apis/t2vlrsyxc0/stages/$default
   apiRoute53Record: n12191434.cab432.com
-  certificateARN: arn:aws:acm:ap-southeast-2:901444280953:certificate/736684e6-a770-4ac7-8a5a-985a73cf7a4e
+  certificateARN: arn:aws:acm:ap-southeast-2:901444280953:certificate/dd11cb64-3e67-466f-b78c-441aab10e389
   cognitoARN: arn:aws:cognito-idp:ap-southeast-2:901444280953:userpool/ap-southeast-2_ZvcLlofqW
   dynamoDBPostsTableARN: arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post
   s3MediaStoreARN: arn:aws:s3:::n12191434-strobe-media

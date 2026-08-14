@@ -143,65 +143,25 @@ function Moments() {
       setIsPosting(true);
 
       const pseudoPostId = `moment-${Date.now()}`;
-      const urlRes = await api.post("/v1/uploads/url", { postId: pseudoPostId });
-      const uploadUrl = resolveApiUrl(urlRes.data.uploadUrl);
-      const fallbackReadUrl = resolveApiUrl(
-        urlRes.data.fileUrl || urlRes.data.publicUrl || urlRes.data.url || ""
-      );
-      if (!uploadUrl) throw new Error("Upload URL is missing or invalid");
+      const contentType = selectedFile.type || "image/jpeg";
+      const urlRes = await api.post("/v1/uploads/url", { postId: pseudoPostId, contentType });
+      const uploadUrl = urlRes.data.uploadUrl;
+      const key = urlRes.data.key;
+      if (!uploadUrl || !key) throw new Error("Upload URL is missing or invalid");
 
-      const isPresignedUpload = /[?&]X-Amz-Algorithm=/i.test(uploadUrl);
-      const uploadRequest = isPresignedUpload
-        ? {
-            method: "PUT",
-            body: selectedFile,
-            headers: {
-              "Content-Type": selectedFile.type || "application/octet-stream",
-            },
-          }
-        : (() => {
-            const formData = new FormData();
-            formData.append("file", selectedFile);
-            return {
-              method: "PUT",
-              body: formData,
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("strobe_token")}`,
-              },
-            };
-          })();
-
-      const uploadRes = await fetch(uploadUrl, uploadRequest);
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        body: selectedFile,
+        headers: { "Content-Type": contentType },
+      });
 
       if (!uploadRes.ok) {
         const uploadErrText = await uploadRes.text().catch(() => "");
-        let uploadErr = null;
-        try {
-          uploadErr = uploadErrText ? JSON.parse(uploadErrText) : null;
-        } catch {
-          uploadErr = null;
-        }
-        throw new Error(uploadErr?.message || uploadErr?.error || uploadErrText || "Failed to upload image");
+        throw new Error(uploadErrText || "Failed to upload image");
       }
-
-      let uploadedPath = null;
-      if (isPresignedUpload) {
-        uploadedPath = fallbackReadUrl || uploadUrl.split("?")[0];
-      } else {
-        const uploadContentType = uploadRes.headers.get("content-type") || "";
-        const uploaded = uploadContentType.includes("application/json")
-          ? await uploadRes.json().catch(() => null)
-          : null;
-        uploadedPath = uploaded?.file?.url || uploaded?.url || null;
-      }
-
-      if (!uploadedPath) throw new Error("Upload did not return image URL");
-
-      const finalImageUrl = resolveApiUrl(uploadedPath);
-      if (!finalImageUrl) throw new Error("Uploaded image URL is invalid");
 
       await api.post("/v1/moments", {
-        imageUrl: finalImageUrl,
+        imageUrl: key,
         caption: captionText.trim(),
       });
 

@@ -71,24 +71,24 @@ Check items off as you complete and verify them. Mirrors the phases in section 2
 
 ### Phase 5 — Edge: API Gateway, Route 53, ACM
 
-- [ ] Request + DNS-validate ACM cert for `n<id>.cab432.com`
-- [ ] Create HTTP API with all routes, `$default` stage
-- [ ] Create custom domain, attach cert, TLS 1.2 minimum
-- [ ] Create Route 53 record
-- [ ] Enable CORS
+- [x] Request + DNS-validate ACM cert for `n<id>.cab432.com`
+- [x] Create HTTP API with all routes, `$default` stage
+- [x] Create custom domain, attach cert, TLS 1.2 minimum
+- [x] Create Route 53 record
+- [x] Enable CORS
 
 ### Phase 6 — Integration test & tagging
 
-- [ ] Tag every resource (`qut-username`, `purpose`)
-- [ ] Point Strobe Web at deployed API, run full flow manually
-- [ ] Re-run Insomnia collection against deployed domain
-- [ ] Test moderator path (403 for non-mod, success for mod)
+- [x] Tag every resource (`qut-username`, `purpose`)
+- [x] Point Strobe Web at deployed API, run full flow manually
+- [x] Re-run Insomnia collection against deployed domain
+- [x] Test moderator path (403 for non-mod, success for mod)
 
 ### Phase 7 — Submission YAML
 
-- [ ] Fill `submission-infra.yml` completely
-- [ ] Fill `submission-routes.yml` completely
-- [ ] Double-check: no keys added/removed, every ARN resolves, every table/Lambda is genuinely distinct
+- [x] Fill `submission-infra.yml` completely
+- [x] Fill `submission-routes.yml` completely
+- [x] Double-check: no keys added/removed, every ARN resolves, every table/Lambda is genuinely distinct
 
 ---
 

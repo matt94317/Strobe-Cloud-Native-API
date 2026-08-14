@@ -15,215 +15,224 @@ routing:
   - route: /v1/auth/register
     method: POST
     controller: auth
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: user, arn: "" }
+    apiGatewayRoute: "POST /v1/auth/register"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-auth"
+    storage: { entity: user, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-users" }
     additionalStorage: []
 
   - route: /v1/auth/login
     method: POST
     controller: auth
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: user, arn: "" }
+    apiGatewayRoute: "POST /v1/auth/login"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-auth"
+    storage: { entity: user, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-users" }
     additionalStorage: []
 
   - route: /v1/posts
     method: POST
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: post, arn: "" }
+    apiGatewayRoute: "POST /v1/posts"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: post, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post" }
     additionalStorage: []
 
   - route: /v1/posts/user/{userId}
     method: GET
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: post, arn: "" }
+    apiGatewayRoute: "GET /v1/posts/user/{userId}"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: post, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post" }
     additionalStorage: []
 
   - route: /v1/posts/{id}
     method: GET
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: post, arn: "" }
+    apiGatewayRoute: "GET /v1/posts/{id}"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: post, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post" }
     additionalStorage: []
 
   - route: /v1/posts/{id}
     method: PUT
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: post, arn: "" }
+    apiGatewayRoute: "PUT /v1/posts/{id}"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: post, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post" }
     additionalStorage: []
 
   - route: /v1/posts/{id}
     method: DELETE
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: post, arn: "" }
+    apiGatewayRoute: "DELETE /v1/posts/{id}"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: post, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post" }
     additionalStorage: []
 
   - route: /v1/posts/{id}/like
     method: POST
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: like, arn: "" }
+    apiGatewayRoute: "POST /v1/posts/{id}/like"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: like, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-likes" }
     additionalStorage: []
 
   - route: /v1/posts/{id}/like
     method: DELETE
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: like, arn: "" }
+    apiGatewayRoute: "DELETE /v1/posts/{id}/like"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: like, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-likes" }
     additionalStorage: []
 
   - route: /v1/posts/{id}/hide
     method: POST
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: post, arn: "" }
+    apiGatewayRoute: "POST /v1/posts/{id}/hide"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: post, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post" }
     additionalStorage: []
 
   - route: /v1/posts/{postId}/comments
     method: POST
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: comment, arn: "" }
+    apiGatewayRoute: "POST /v1/posts/{postId}/comments"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: comment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-comments" }
     additionalStorage: []
 
   - route: /v1/posts/{postId}/comments
     method: GET
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: comment, arn: "" }
+    apiGatewayRoute: "GET /v1/posts/{postId}/comments"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: comment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-comments" }
     additionalStorage: []
 
   - route: /v1/posts/{postId}/comments/{commentId}
     method: DELETE
     controller: post
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: comment, arn: "" }
+    apiGatewayRoute: "DELETE /v1/posts/{postId}/comments/{commentId}"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-post"
+    storage: { entity: comment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-comments" }
     additionalStorage: []
 
   - route: /v1/feed
     method: GET
     controller: feed
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: post, arn: "" }
-    additionalStorage: [] # e.g. user/follow/like/comment, if your feed enriches with them
+    apiGatewayRoute: "GET /v1/feed"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-feed"
+    storage: { entity: post, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post" }
+    additionalStorage:
+      - { entity: follow, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-follows" }
+      - { entity: like, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-likes" }
+      - { entity: comment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-comments" }
+      - { entity: user, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-users" }
 
   - route: /v1/users
     method: GET
     controller: user
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: user, arn: "" }
+    apiGatewayRoute: "GET /v1/users"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-user"
+    storage: { entity: user, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-users" }
     additionalStorage: []
 
   - route: /v1/users/{id}
     method: GET
     controller: user
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: user, arn: "" }
+    apiGatewayRoute: "GET /v1/users/{id}"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-user"
+    storage: { entity: user, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-users" }
     additionalStorage: []
 
   - route: /v1/users/{id}
     method: DELETE
     controller: user
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: user, arn: "" }
-    additionalStorage: [] # cascading delete typically touches post/comment/like/follow/moment too
+    apiGatewayRoute: "DELETE /v1/users/{id}"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-user"
+    storage: { entity: user, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-users" }
+    additionalStorage:
+      - { entity: post, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-post" }
+      - { entity: comment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-comments" }
+      - { entity: like, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-likes" }
+      - { entity: follow, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-follows" }
+      - { entity: moment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-moments" }
 
   - route: /v1/users/{userId}/follow
     method: POST
     controller: user
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: follow, arn: "" }
+    apiGatewayRoute: "POST /v1/users/{userId}/follow"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-user"
+    storage: { entity: follow, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-follows" }
     additionalStorage: []
 
   - route: /v1/users/{userId}/follow
     method: DELETE
     controller: user
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: follow, arn: "" }
+    apiGatewayRoute: "DELETE /v1/users/{userId}/follow"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-user"
+    storage: { entity: follow, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-follows" }
     additionalStorage: []
 
   - route: /v1/users/{userId}/followers
     method: GET
     controller: user
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: follow, arn: "" }
+    apiGatewayRoute: "GET /v1/users/{userId}/followers"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-user"
+    storage: { entity: follow, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-follows" }
     additionalStorage: []
 
   - route: /v1/users/{userId}/following
     method: GET
     controller: user
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: follow, arn: "" }
+    apiGatewayRoute: "GET /v1/users/{userId}/following"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-user"
+    storage: { entity: follow, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-follows" }
     additionalStorage: []
 
   - route: /v1/uploads/url
     method: POST
     controller: upload
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: media, arn: "" } # an S3 bucket ARN here, not DynamoDB
+    apiGatewayRoute: "POST /v1/uploads/url"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-upload"
+    storage: { entity: media, arn: "arn:aws:s3:::n12191434-strobe-media" } # an S3 bucket ARN here, not DynamoDB
     additionalStorage: []
 
   - route: /v1/moments
     method: POST
     controller: moment
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: moment, arn: "" }
+    apiGatewayRoute: "POST /v1/moments"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-moment"
+    storage: { entity: moment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-moments" }
     additionalStorage: []
 
   - route: /v1/moments/feed
     method: GET
     controller: moment
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: moment, arn: "" }
+    apiGatewayRoute: "GET /v1/moments/feed"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-moment"
+    storage: { entity: moment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-moments" }
     additionalStorage: []
 
   - route: /v1/moments/archive
     method: GET
     controller: moment
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: moment, arn: "" }
+    apiGatewayRoute: "GET /v1/moments/archive"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-moment"
+    storage: { entity: moment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-moments" }
     additionalStorage: []
 
   - route: /v1/moments/{id}/hide
     method: POST
     controller: moment
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: moment, arn: "" }
+    apiGatewayRoute: "POST /v1/moments/{id}/hide"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-moment"
+    storage: { entity: moment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-moments" }
     additionalStorage: []
 
   - route: /v1/moments/{id}
     method: DELETE
     controller: moment
-    apiGatewayRoute: ""
-    lambdaARN: ""
-    storage: { entity: moment, arn: "" }
+    apiGatewayRoute: "DELETE /v1/moments/{id}"
+    lambdaARN: "arn:aws:lambda:ap-southeast-2:901444280953:function:n12191434-lambda-moment"
+    storage: { entity: moment, arn: "arn:aws:dynamodb:ap-southeast-2:901444280953:table/n12191434-ddb-moments" }
     additionalStorage: []

@@ -89,10 +89,18 @@ server/
 
 ## Useful notes
 
-- Seed uses `password123` for generated users.
-- The first seeded user is a moderator.
 - Protected routes require a bearer token in the Authorization header.
 - Import insomnia/strobe-openapi.yaml into Insomnia for ready-to-use requests.
+
+## Test Accounts (deployed AWS stack)
+
+Auth is backed by Cognito, not seeded local data — use these accounts against the deployed API
+(`https://n12191434.cab432.com`) or a local server pointed at the same Cognito pool/DynamoDB tables.
+
+| Account | Email | Password | Role |
+| --- | --- | --- | --- |
+| Pre-created submission test account (`submission-infra.yml`) | `n12191434.test@cab432.com` | `12191434` | `moderators` group |
+| Throwaway second account (for follow/comment/moderator-check testing) | `second-test@example.com` | `TestPass123` | regular user |
 
 ## Insomnia
 
