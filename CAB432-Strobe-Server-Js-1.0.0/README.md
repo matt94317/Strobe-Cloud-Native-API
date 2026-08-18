@@ -97,10 +97,22 @@ server/
 Auth is backed by Cognito, not seeded local data — use these accounts against the deployed API
 (`https://n12191434.cab432.com`) or a local server pointed at the same Cognito pool/DynamoDB tables.
 
-| Account | Email | Password | Role |
-| --- | --- | --- | --- |
-| Pre-created submission test account (`submission-infra.yml`) | `n12191434.test@cab432.com` | `12191434` | `moderators` group |
-| Throwaway second account (for follow/comment/moderator-check testing) | `second-test@example.com` | `TestPass123` | regular user |
+| Account                                                               | Email                         | Password        | Role                 |
+| --------------------------------------------------------------------- | ----------------------------- | --------------- | -------------------- |
+| Pre-created submission test account (`submission-infra.yml`)        | `n12191434.test@cab432.com` | `12191434`    | `moderators` group |
+| Throwaway second account (for follow/comment/moderator-check testing) | `second-test@example.com`   | `TestPass123` | regular user         |
+
+### Auth contract notes
+
+- **Credential field.** `POST /v1/auth/register` and `POST /v1/auth/login` accept the account's
+  address under `email` *or* `username` (also `userName` / `login`). The Cognito pool uses the email
+  as the username, so the two are the same value and either key is honoured.
+- **Roles.** Registering with `role: "moderator"` also adds the account to the Cognito `moderators`
+  group. Authorisation is gated on the group carried in the access token, so the stored role and the
+  group must agree - a moderator row without the group would claim a privilege the token never grants.
+- **Feed.** `GET /v1/feed` returns posts from the accounts the caller follows *and* the caller's own
+  posts, newest first. A brand new account follows nobody, and excluding its own posts would leave
+  the feed empty right after posting.
 
 ## Insomnia
 

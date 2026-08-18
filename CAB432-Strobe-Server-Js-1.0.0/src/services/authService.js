@@ -1,8 +1,9 @@
 import * as userModel from "../models/userModel.js";
 import jwt from "jsonwebtoken";
 import {
-  AdminCreateUserCommand,
-  AdminSetUserPasswordCommand,
+  SignUpCommand,
+  AdminConfirmSignUpCommand,
+  AdminAddUserToGroupCommand,
   AdminInitiateAuthCommand,
   AdminDeleteUserCommand,
   InitiateAuthCommand,
@@ -28,14 +29,36 @@ function normaliseEmail(value) {
   return (value || "").trim().toLowerCase();
 }
 
+// The account's email doubles as its username (the Cognito pool uses email as
+// the username/alias), so callers may send either key. Accept both rather than
+// rejecting an otherwise valid credential pair over the field name.
+const IDENTIFIER_KEYS = ["email", "username", "userName", "login"];
+
+// Cognito group backing ROLES.MODERATOR - must match the group the auth
+// middleware reads out of the access token.
+const MODERATORS_GROUP = "moderators";
+
+function extractIdentifier(body) {
+  const source = body ?? {};
+
+  for (const key of IDENTIFIER_KEYS) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim() !== "") {
+      return normaliseEmail(value);
+    }
+  }
+
+  return "";
+}
+
 /**
  * Register a new user
  * @param {Object} userData - { email, password, role }
  * @returns {Promise<Object>} { user, token }
  */
 export async function registerUser(userData) {
-  const { email, password, role } = userData;
-  const normalisedEmail = normaliseEmail(email);
+  const { password, role } = userData ?? {};
+  const normalisedEmail = extractIdentifier(userData);
   // Username is always set to match email (Cognito pool uses email as username/alias)
   const username = normalisedEmail;
 
@@ -56,34 +79,61 @@ export async function registerUser(userData) {
     throw validationError(roleValidation.error);
   }
 
-  // Cognito is the source of truth for uniqueness (email = username)
+  // Cognito is the source of truth for uniqueness (email = username).
+  // CAB432-Lambda-Role doesn't grant AdminSetUserPassword, so registration
+  // goes through the public SignUp flow (the caller sets the password
+  // directly) and is confirmed immediately via AdminConfirmSignUp, so the
+  // account is usable right away without waiting on an emailed code.
   let cognitoSub;
   try {
-    const created = await cognitoClient.send(
-      new AdminCreateUserCommand({
-        UserPoolId: config.cognito.userPoolId,
-        Username: normalisedEmail,
-        UserAttributes: [
-          { Name: "email", Value: normalisedEmail },
-          { Name: "email_verified", Value: "true" },
-        ],
-        MessageAction: "SUPPRESS",
-      }),
-    );
-    cognitoSub = created.User.Attributes.find((a) => a.Name === "sub").Value;
-
-    await cognitoClient.send(
-      new AdminSetUserPasswordCommand({
-        UserPoolId: config.cognito.userPoolId,
+    const signedUp = await cognitoClient.send(
+      new SignUpCommand({
+        ClientId: config.cognito.clientId,
         Username: normalisedEmail,
         Password: password,
-        Permanent: true,
+        UserAttributes: [{ Name: "email", Value: normalisedEmail }],
       }),
     );
+    cognitoSub = signedUp.UserSub;
+
+    await cognitoClient.send(
+      new AdminConfirmSignUpCommand({
+        UserPoolId: config.cognito.userPoolId,
+        Username: normalisedEmail,
+      }),
+    );
+
+    // Authorisation is gated on the Cognito group carried in the access token,
+    // so a moderator registration has to land in the group as well as in the
+    // user row - otherwise the stored role would claim a privilege the token
+    // never grants.
+    if (requestedRole === ROLES.MODERATOR) {
+      await cognitoClient.send(
+        new AdminAddUserToGroupCommand({
+          UserPoolId: config.cognito.userPoolId,
+          Username: normalisedEmail,
+          GroupName: MODERATORS_GROUP,
+        }),
+      );
+    }
   } catch (err) {
     if (err.name === "UsernameExistsException") {
       throw conflictError(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
     }
+
+    // SignUp succeeded but a later step didn't: drop the half-provisioned
+    // identity so the address stays free for a retry.
+    if (cognitoSub) {
+      await cognitoClient
+        .send(
+          new AdminDeleteUserCommand({
+            UserPoolId: config.cognito.userPoolId,
+            Username: normalisedEmail,
+          }),
+        )
+        .catch(() => {});
+    }
+
     throw err;
   }
 
@@ -134,8 +184,8 @@ export async function registerUser(userData) {
  * @returns {Promise<Object>} { user, token }
  */
 export async function loginUser(credentials) {
-  const { email, password } = credentials;
-  const normalisedEmail = normaliseEmail(email);
+  const { password } = credentials ?? {};
+  const normalisedEmail = extractIdentifier(credentials);
 
   // Validate inputs
   if (!normalisedEmail || !password) {

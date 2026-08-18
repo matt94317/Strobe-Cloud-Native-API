@@ -12,7 +12,7 @@ import { ERROR_MESSAGES, ROLES } from "../config/constants.js";
  * @param {number} limit - Maximum posts to return
  * @param {number} offset - Pagination offset
  * @param {string} userRole - Current user role
- * @returns {Promise<Array>} Array of posts from followed users (enriched)
+ * @returns {Promise<Array>} Array of posts from the caller and followed users (enriched)
  */
 export async function getUserFeed(
   userId,
@@ -26,20 +26,16 @@ export async function getUserFeed(
     throw notFoundError(ERROR_MESSAGES.USER_NOT_FOUND);
   }
 
-  // Get list of users being followed
+  // Get list of users being followed. The caller is included so their own
+  // posts show up in their feed - a brand new account follows nobody, and an
+  // empty feed there would hide the posts they just made.
   const followingUserIds = await followModel.getFollowing(userId);
+  const authorIds = followingUserIds.includes(userId)
+    ? followingUserIds
+    : [...followingUserIds, userId];
 
-  // If not following anyone, return empty feed
-  if (followingUserIds.length === 0) {
-    return [];
-  }
-
-  // Get posts from followed users
-  const posts = await postModel.getPostsFromUsers(
-    followingUserIds,
-    limit,
-    offset,
-  );
+  // Get posts from the caller and the users they follow
+  const posts = await postModel.getPostsFromUsers(authorIds, limit, offset);
 
   const visiblePosts = posts.filter((post) => {
     if (userRole === ROLES.MODERATOR || post.userId === userId) {
